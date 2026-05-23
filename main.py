@@ -147,6 +147,7 @@ class RhythmApp(QWidget):
         self.time_signature_inputs = []
         self.tuplet_inputs = []
         self.instrument_checkboxes = []
+        self.strokes_inputs = []
         self.current_patterns = []
         self.play_timers = []
         self.play_buttons = []
@@ -160,7 +161,7 @@ class RhythmApp(QWidget):
             row.setFixedHeight(130)
 
             row_layout = QHBoxLayout()
-            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setContentsMargins(0, 5, 0, 5)
 
             web = QWebEngineView()
             web.setFixedHeight(130)
@@ -215,7 +216,7 @@ class RhythmApp(QWidget):
             # Instrument checkboxes
             instruments_widget = QWidget()
             instruments_layout = QVBoxLayout()
-            instruments_layout.setContentsMargins(0, 10, 0, 0)
+            instruments_layout.setContentsMargins(0, 15, 0, 0)
             instruments_layout.setSpacing(0)
 
             instruments_layout.addStretch()
