@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtGui import QIntValidator
-from PySide6.QtWidgets import QApplication, QComboBox, QLabel, QLineEdit, QWidget, QHBoxLayout, QVBoxLayout, QPushButton
+from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QLabel, QLineEdit, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QSpinBox
 from PySide6.QtMultimedia import QSoundEffect
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
@@ -140,12 +140,13 @@ class RhythmApp(QWidget):
         super().__init__()
 
         self.setWindowTitle("Rhythym Generator")
-        self.resize(600, 840)
-        self.setFixedSize(600, 840)
+        self.resize(670, 840)
+        self.setFixedSize(670, 840)
 
         self.web_views = []
         self.time_signature_inputs = []
-        self.preset_inputs = []
+        self.tuplet_inputs = []
+        self.instrument_checkboxes = []
         self.current_patterns = []
         self.play_timers = []
         self.play_buttons = []
@@ -168,28 +169,28 @@ class RhythmApp(QWidget):
             pattern_label.setFixedWidth(150)
 
             button = QPushButton("Generate")
-            button.setFixedWidth(150)
+            button.setFixedWidth(100)
             button.clicked.connect(
                 lambda checked=False, index=pattern_number: self.generate(index)
             )
 
             play_button = QPushButton("Play")
-            play_button.setFixedWidth(150)
+            play_button.setFixedWidth(100)
             play_button.clicked.connect(
                 lambda checked=False, index=pattern_number: self.play(index)
             )
 
             numerator_input = QLineEdit("2")
             numerator_input.setValidator(QIntValidator(1, 16))
-            numerator_input.setFixedWidth(42)
+            numerator_input.setFixedWidth(43)
 
             denominator_input = QLineEdit("4")
             denominator_input.setValidator(QIntValidator(1, 16))
-            denominator_input.setFixedWidth(42)
+            denominator_input.setFixedWidth(43)
 
-            preset_input = QComboBox()
-            preset_input.addItems(preset_names())
-            preset_input.setFixedWidth(150)
+            tuplet_input = QComboBox()
+            tuplet_input.addItems(["Normal", "Triplet", "Quintuplet", "Septuplet"])
+            tuplet_input.setFixedWidth(100)
 
             time_signature_layout = QHBoxLayout()
             time_signature_layout.setContentsMargins(0, 0, 0, 0)
@@ -199,23 +200,53 @@ class RhythmApp(QWidget):
             time_signature_layout.addWidget(denominator_input)
             time_signature_layout.addStretch()
 
+            # Left controls panel
+            left_controls = QWidget()
+            left_controls_layout = QVBoxLayout()
+            left_controls_layout.setContentsMargins(0, 0, 0, 0)
+            left_controls_layout.addWidget(pattern_label)
+            left_controls_layout.addLayout(time_signature_layout)
+            left_controls_layout.addWidget(tuplet_input)
+            left_controls_layout.addWidget(play_button)
+            left_controls_layout.addWidget(button)
+            left_controls_layout.addStretch()
+            left_controls.setLayout(left_controls_layout)
+
+            # Instrument checkboxes
+            instruments_widget = QWidget()
+            instruments_layout = QVBoxLayout()
+            instruments_layout.setContentsMargins(0, 10, 0, 0)
+            instruments_layout.setSpacing(0)
+
+            instruments_layout.addStretch()
+
+            instrument_checks = {}
+            for instrument in ["Snare", "Kick", "Hihat", "Ride"]:
+                checkbox = QCheckBox(instrument)
+                checkbox.setChecked(instrument == "Snare")
+                instrument_checks[instrument] = checkbox
+                instruments_layout.addWidget(checkbox)
+
+            instruments_layout.addStretch()
+            instruments_widget.setLayout(instruments_layout)
+            self.instrument_checkboxes.append(instrument_checks)
+
+            # Combined controls widget
             controls = QWidget()
-            controls.setFixedWidth(150)
-            controls_layout = QVBoxLayout()
+            controls.setFixedWidth(180)
+            controls_layout = QHBoxLayout()
             controls_layout.setContentsMargins(0, 0, 0, 0)
-            controls_layout.addWidget(pattern_label)
-            controls_layout.addWidget(preset_input)
-            controls_layout.addLayout(time_signature_layout)
-            controls_layout.addWidget(play_button)
-            controls_layout.addWidget(button)
-            controls_layout.addStretch()
+            controls_layout.setSpacing(0)
+            controls_layout.addWidget(left_controls)
+            controls_layout.addWidget(instruments_widget)
             controls.setLayout(controls_layout)
 
             self.web_views.append(web)
             self.time_signature_inputs.append((numerator_input, denominator_input))
-            self.preset_inputs.append(preset_input)
+            self.tuplet_inputs.append(tuplet_input)
             self.current_patterns.append([])
             self.play_buttons.append(play_button)
+
             row_layout.addWidget(controls)
             row_layout.addWidget(web)
             row.setLayout(row_layout)
@@ -228,7 +259,7 @@ class RhythmApp(QWidget):
 
     def generate(self, index):
         numerator, denominator = self.get_time_signature(index)
-        preset_name = self.preset_inputs[index].currentText()
+        preset_name = "Singles (16ᵗʰ Notes)"
         pattern = generate_pattern(numerator, denominator, preset_name)
         self.current_patterns[index] = pattern
         html = make_html(pattern, numerator, denominator)
