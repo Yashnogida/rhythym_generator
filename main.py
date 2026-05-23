@@ -204,7 +204,7 @@ class RhythmApp(QWidget):
             # Left controls panel
             left_controls = QWidget()
             left_controls_layout = QVBoxLayout()
-            left_controls_layout.setContentsMargins(0, 0, 0, 0)
+            left_controls_layout.setContentsMargins(0, 5, 0, 5)
             left_controls_layout.addWidget(pattern_label)
             left_controls_layout.addLayout(time_signature_layout)
             left_controls_layout.addWidget(tuplet_input)
