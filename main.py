@@ -140,8 +140,8 @@ class RhythmApp(QWidget):
         super().__init__()
 
         self.setWindowTitle("Rhythym Generator")
-        self.resize(670, 840)
-        self.setFixedSize(670, 840)
+        self.resize(870, 840)
+        self.setFixedSize(870, 840)
 
         self.web_views = []
         self.time_signature_inputs = []
@@ -231,6 +231,9 @@ class RhythmApp(QWidget):
             header_layout.addSpacing(15)  # Additional spacing
             strokes_label = QLabel("Strokes")
             header_layout.addWidget(strokes_label)
+            header_layout.addSpacing(15)  # Spacing before Type
+            type_label = QLabel("Type")
+            header_layout.addWidget(type_label)
             header_layout.addStretch()
             header_row.setLayout(header_layout)
             instruments_layout.addWidget(header_row)
@@ -239,7 +242,7 @@ class RhythmApp(QWidget):
             for instrument in ["Snare", "Kick", "Hihat", "Ride"]:
                 instrument_row = QWidget()
                 instrument_row_layout = QHBoxLayout()
-                instrument_row_layout.setContentsMargins(0, 0, 0, 0)
+                instrument_row_layout.setContentsMargins(0, 0, 35, 0)
                 instrument_row_layout.setSpacing(5)
                 
                 label = QLabel(instrument)
@@ -251,14 +254,23 @@ class RhythmApp(QWidget):
                 instrument_checks[instrument] = checkbox
                 
                 value_box = QComboBox()
-                value_box.addItems(["-", "1", "2", "3", "4"])
+                value_box.addItems(["1", "2", "3", "4"])
                 value_box.setFixedWidth(50)
-                if instrument == "Snare":
-                    value_box.setCurrentIndex(1)  # Set default to "1"
+                value_box.setCurrentIndex(0)  # Default to "1"
+                value_box.setEnabled(checkbox.isChecked())
+                
+                type_box = QComboBox()
+                type_box.addItems(["Only", "Max"])
+                type_box.setFixedWidth(75)
+                type_box.setEnabled(checkbox.isChecked())
+                
+                checkbox.toggled.connect(value_box.setEnabled)
+                checkbox.toggled.connect(type_box.setEnabled)
                 
                 instrument_row_layout.addWidget(label)
                 instrument_row_layout.addWidget(checkbox)
                 instrument_row_layout.addWidget(value_box)
+                instrument_row_layout.addWidget(type_box)
                 instrument_row_layout.addStretch()
                 
                 instrument_row.setLayout(instrument_row_layout)
@@ -270,7 +282,7 @@ class RhythmApp(QWidget):
 
             # Combined controls widget
             controls = QWidget()
-            controls.setFixedWidth(240)
+            controls.setFixedWidth(340)
             controls_layout = QHBoxLayout()
             controls_layout.setContentsMargins(0, 0, 0, 0)
             controls_layout.setSpacing(0)
