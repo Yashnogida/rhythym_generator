@@ -4,11 +4,11 @@ from pathlib import Path
 
 from PySide6.QtCore import QTimer, QUrl, Qt
 from PySide6.QtGui import QIntValidator
-from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QLabel, QLineEdit, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QSpinBox
+from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QLabel, QLineEdit, QMessageBox, QWidget, QHBoxLayout, QVBoxLayout, QPushButton
 from PySide6.QtMultimedia import QSoundEffect
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
-from patterns import generate_pattern, preset_names
+from patterns import generate_drum_exercise
 
 
 NOTE_VALUES = {
@@ -146,8 +146,7 @@ class RhythmApp(QWidget):
         self.web_views = []
         self.time_signature_inputs = []
         self.tuplet_inputs = []
-        self.instrument_checkboxes = []
-        self.strokes_inputs = []
+        self.instrument_controls = []
         self.current_patterns = []
         self.play_timers = []
         self.play_buttons = []
@@ -238,7 +237,7 @@ class RhythmApp(QWidget):
             header_row.setLayout(header_layout)
             instruments_layout.addWidget(header_row)
 
-            instrument_checks = {}
+            instrument_controls = {}
             for instrument in ["Snare", "Kick", "Hihat", "Ride"]:
                 instrument_row = QWidget()
                 instrument_row_layout = QHBoxLayout()
@@ -251,7 +250,6 @@ class RhythmApp(QWidget):
                 checkbox = QCheckBox()
                 checkbox.setChecked(instrument == "Snare")
                 checkbox.setFixedWidth(20)
-                instrument_checks[instrument] = checkbox
                 
                 value_box = QComboBox()
                 value_box.addItems(["1", "2", "3", "4"])
@@ -266,6 +264,11 @@ class RhythmApp(QWidget):
                 
                 checkbox.toggled.connect(value_box.setEnabled)
                 checkbox.toggled.connect(type_box.setEnabled)
+                instrument_controls[instrument] = {
+                    "checkbox": checkbox,
+                    "strokes": value_box,
+                    "type": type_box,
+                }
                 
                 instrument_row_layout.addWidget(label)
                 instrument_row_layout.addWidget(checkbox)
@@ -278,7 +281,7 @@ class RhythmApp(QWidget):
 
             instruments_layout.addStretch()
             instruments_widget.setLayout(instruments_layout)
-            self.instrument_checkboxes.append(instrument_checks)
+            self.instrument_controls.append(instrument_controls)
 
             # Combined controls widget
             controls = QWidget()
@@ -308,11 +311,59 @@ class RhythmApp(QWidget):
 
     def generate(self, index):
         numerator, denominator = self.get_time_signature(index)
-        preset_name = "Singles (16ᵗʰ Notes)"
-        pattern = generate_pattern(numerator, denominator, preset_name)
+        drum_options = self.get_drum_options(index)
+        error = self.validate_drum_options(numerator, denominator, drum_options)
+
+        if error:
+            QMessageBox.warning(self, "Cannot generate exercise", error)
+            return
+
+        pattern = generate_drum_exercise(numerator, denominator, drum_options)
         self.current_patterns[index] = pattern
         html = make_html(pattern, numerator, denominator)
         self.web_views[index].setHtml(html)
+
+    def get_drum_options(self, index):
+        options = []
+
+        for instrument, controls in self.instrument_controls[index].items():
+            if not controls["checkbox"].isChecked():
+                continue
+
+            options.append({
+                "instrument": instrument.lower(),
+                "strokes": int(controls["strokes"].currentText()),
+                "type": controls["type"].currentText().lower(),
+            })
+
+        return options
+
+    def validate_drum_options(self, numerator, denominator, drum_options):
+        if not drum_options:
+            return "Select at least one drum."
+
+        slots = numerator * (16 / denominator)
+        if slots != int(slots):
+            return "This time signature does not divide evenly into 16th notes."
+
+        slots = int(slots)
+        invalid_only_options = [
+            option
+            for option in drum_options
+            if option["type"] == "only" and slots % option["strokes"] != 0
+        ]
+
+        if invalid_only_options:
+            descriptions = [
+                f"{option['instrument'].title()} Only {option['strokes']}"
+                for option in invalid_only_options
+            ]
+            return (
+                f"This exercise has {slots} 16th notes, so "
+                f"{', '.join(descriptions)} cannot fill it evenly."
+            )
+
+        return ""
 
     def load_sounds(self):
         sample_dir = Path(__file__).resolve().parent / "samples"
@@ -404,7 +455,10 @@ class RhythmApp(QWidget):
 
         instrument = note.get("instrument", "")
         if instrument:
-            return [name for name in ("kick", "snare", "ride") if name in instrument]
+            sound_names = [name for name in ("kick", "snare", "ride") if name in instrument]
+            if "hihat" in instrument:
+                sound_names.append("stick")
+            return sound_names
 
         return ["stick"]
 

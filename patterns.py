@@ -65,6 +65,192 @@ def generate_pattern(numerator, denominator, preset_name):
     return [generate_valid_measure(beats, preset)]
 
 
+def generate_drum_exercise(numerator, denominator, drum_options):
+    slots = int(numerator * (16 / denominator))
+    snare_only = is_snare_only_exercise(drum_options)
+
+    for _ in range(1000):
+        measure = generate_drum_measure(slots, drum_options, snare_only)
+        if follows_drum_options(measure, drum_options):
+            return [measure]
+
+    return [measure]
+
+
+def is_snare_only_exercise(drum_options):
+    return (
+        len(drum_options) == 1
+        and drum_options[0]["instrument"] == "snare"
+    )
+
+
+def generate_drum_measure(slots, drum_options, snare_only):
+    notes = []
+    hand_histories = {
+        option["instrument"]: []
+        for option in drum_options
+    }
+    only_groups = {
+        option["instrument"]: {
+            "hand": random.choice(["L", "R"]),
+            "remaining": 0,
+        }
+        for option in drum_options
+        if option["type"] == "only"
+    }
+
+    while len(notes) < slots:
+        remaining_slots = slots - len(notes)
+        option = choose_drum_option(drum_options, only_groups, remaining_slots)
+        instrument = option["instrument"]
+        hand = choose_drum_hand(option, hand_histories[instrument], only_groups)
+
+        notes.append(build_drum_note(instrument, hand, snare_only))
+
+    return notes
+
+
+def choose_drum_option(drum_options, only_groups, remaining_slots):
+    active_only_options = [
+        option
+        for option in drum_options
+        if (
+            option["type"] == "only"
+            and only_groups[option["instrument"]]["remaining"] > 0
+        )
+    ]
+
+    if active_only_options:
+        return random.choice(active_only_options)
+
+    possible_options = [
+        option
+        for option in drum_options
+        if option["type"] == "max" or option["strokes"] <= remaining_slots
+    ]
+
+    return random.choice(possible_options or drum_options)
+
+
+def choose_drum_hand(option, hand_history, only_groups):
+    if option["type"] == "only":
+        group = only_groups[option["instrument"]]
+
+        if group["remaining"] == 0:
+            if hand_history:
+                group["hand"] = "L" if hand_history[-1] == "R" else "R"
+            group["remaining"] = option["strokes"]
+
+        hand = group["hand"]
+        group["remaining"] -= 1
+        hand_history.append(hand)
+        return hand
+
+    return choose_hand(hand_history, option["strokes"])
+
+
+def build_drum_note(instrument, hand, snare_only):
+    note = {
+        "duration": "16",
+        "keys": instrument_keys(instrument),
+        "instrument": instrument,
+        "stroke_hand": hand,
+        "accented": instrument == "snare" and random.random() < 0.25,
+    }
+
+    if instrument == "snare":
+        note["hand"] = hand
+
+    if not snare_only:
+        note["staff"] = "drumset"
+
+    return note
+
+
+def follows_drum_options(measure, drum_options):
+    for option in drum_options:
+        if option["instrument"] != "snare":
+            instrument_run_lengths = consecutive_instrument_run_lengths(
+                measure,
+                option["instrument"],
+            )
+
+            if not instrument_run_lengths:
+                continue
+
+            if option["type"] == "only":
+                if any(length != option["strokes"] for length in instrument_run_lengths):
+                    return False
+            elif any(length > option["strokes"] for length in instrument_run_lengths):
+                return False
+
+            continue
+
+        snare_hands = [
+            note["stroke_hand"]
+            for note in measure
+            if note.get("instrument") == "snare"
+        ]
+
+        if not snare_hands:
+            continue
+
+        if option["type"] == "only":
+            if not follows_only_stroke_rule(snare_hands, option["strokes"]):
+                return False
+        elif not follows_hand_sequence_rule(snare_hands, option["strokes"]):
+            return False
+
+    return True
+
+
+def consecutive_instrument_run_lengths(measure, instrument):
+    run_lengths = []
+    current_run = 0
+
+    for note in measure:
+        if note.get("instrument") == instrument:
+            current_run += 1
+        elif current_run:
+            run_lengths.append(current_run)
+            current_run = 0
+
+    if current_run:
+        run_lengths.append(current_run)
+
+    return run_lengths
+
+
+def follows_only_stroke_rule(hands, strokes):
+    if len(hands) % strokes != 0:
+        return False
+
+    for index in range(0, len(hands), strokes):
+        group = hands[index:index + strokes]
+        if len(set(group)) != 1:
+            return False
+
+        next_group = hands[index + strokes:index + (strokes * 2)]
+        if next_group and group[0] == next_group[0]:
+            return False
+
+    return True
+
+
+def follows_hand_sequence_rule(hands, max_same_hand):
+    same_hand_count = 1
+
+    for previous_hand, current_hand in zip(hands, hands[1:]):
+        if current_hand == previous_hand:
+            same_hand_count += 1
+            if same_hand_count > max_same_hand:
+                return False
+        else:
+            same_hand_count = 1
+
+    return True
+
+
 def generate_valid_measure(beats, preset):
     for _ in range(1000):
         hand_history = []
@@ -142,6 +328,8 @@ def instrument_keys(instrument):
         return ["f/4"]
     if instrument == "ride":
         return ["g/5"]
+    if instrument == "hihat":
+        return ["f/5"]
 
     return ["c/5"]
 
