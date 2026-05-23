@@ -2,7 +2,7 @@ import json
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QTimer, QUrl
+from PySide6.QtCore import QTimer, QUrl, Qt
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QLabel, QLineEdit, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QSpinBox
 from PySide6.QtMultimedia import QSoundEffect
@@ -221,12 +221,48 @@ class RhythmApp(QWidget):
 
             instruments_layout.addStretch()
 
+            # Header row for Strokes label
+            header_row = QWidget()
+            header_layout = QHBoxLayout()
+            header_layout.setContentsMargins(0, 0, 0, 0)
+            header_layout.setSpacing(5)
+            header_layout.addSpacing(30)  # Label width
+            header_layout.addSpacing(20)  # Checkbox width
+            header_layout.addSpacing(15)  # Additional spacing
+            strokes_label = QLabel("Strokes")
+            header_layout.addWidget(strokes_label)
+            header_layout.addStretch()
+            header_row.setLayout(header_layout)
+            instruments_layout.addWidget(header_row)
+
             instrument_checks = {}
             for instrument in ["Snare", "Kick", "Hihat", "Ride"]:
-                checkbox = QCheckBox(instrument)
+                instrument_row = QWidget()
+                instrument_row_layout = QHBoxLayout()
+                instrument_row_layout.setContentsMargins(0, 0, 0, 0)
+                instrument_row_layout.setSpacing(5)
+                
+                label = QLabel(instrument)
+                label.setFixedWidth(30)                
+                label.setAlignment(Qt.AlignRight)                
+                checkbox = QCheckBox()
                 checkbox.setChecked(instrument == "Snare")
+                checkbox.setFixedWidth(20)
                 instrument_checks[instrument] = checkbox
-                instruments_layout.addWidget(checkbox)
+                
+                value_box = QComboBox()
+                value_box.addItems(["-", "1", "2", "3", "4"])
+                value_box.setFixedWidth(50)
+                if instrument == "Snare":
+                    value_box.setCurrentIndex(1)  # Set default to "1"
+                
+                instrument_row_layout.addWidget(label)
+                instrument_row_layout.addWidget(checkbox)
+                instrument_row_layout.addWidget(value_box)
+                instrument_row_layout.addStretch()
+                
+                instrument_row.setLayout(instrument_row_layout)
+                instruments_layout.addWidget(instrument_row)
 
             instruments_layout.addStretch()
             instruments_widget.setLayout(instruments_layout)
@@ -234,7 +270,7 @@ class RhythmApp(QWidget):
 
             # Combined controls widget
             controls = QWidget()
-            controls.setFixedWidth(180)
+            controls.setFixedWidth(240)
             controls_layout = QHBoxLayout()
             controls_layout.setContentsMargins(0, 0, 0, 0)
             controls_layout.setSpacing(0)
