@@ -8,6 +8,33 @@ DURATIONS = [
     ("h", 2.0),    # half
 ]
 
+TUPLETS = {
+    "Normal": {
+        "subdivision": 4,
+        "duration": "16",
+        "tuplet_notes": None,
+        "notes_occupied": None,
+    },
+    "Triplet": {
+        "subdivision": 3,
+        "duration": "8",
+        "tuplet_notes": 3,
+        "notes_occupied": 2,
+    },
+    "Quintuplet": {
+        "subdivision": 5,
+        "duration": "16",
+        "tuplet_notes": 5,
+        "notes_occupied": 4,
+    },
+    "Septuplet": {
+        "subdivision": 7,
+        "duration": "16",
+        "tuplet_notes": 7,
+        "notes_occupied": 4,
+    },
+}
+
 
 PRESETS = {
 
@@ -65,12 +92,13 @@ def generate_pattern(numerator, denominator, preset_name):
     return [generate_valid_measure(beats, preset)]
 
 
-def generate_drum_exercise(numerator, denominator, drum_options):
-    slots = int(numerator * (16 / denominator))
+def generate_drum_exercise(numerator, denominator, drum_options, tuplet_name="Normal"):
+    tuplet = TUPLETS[tuplet_name]
+    slots = int(numerator * (4 / denominator) * tuplet["subdivision"])
     snare_only = is_snare_only_exercise(drum_options)
 
     for _ in range(1000):
-        measure = generate_drum_measure(slots, drum_options, snare_only)
+        measure = generate_drum_measure(slots, drum_options, snare_only, tuplet)
         if follows_drum_options(measure, drum_options):
             return [measure]
 
@@ -84,7 +112,7 @@ def is_snare_only_exercise(drum_options):
     )
 
 
-def generate_drum_measure(slots, drum_options, snare_only):
+def generate_drum_measure(slots, drum_options, snare_only, tuplet):
     notes = []
     hand_histories = {
         option["instrument"]: []
@@ -105,7 +133,7 @@ def generate_drum_measure(slots, drum_options, snare_only):
         instrument = option["instrument"]
         hand = choose_drum_hand(option, hand_histories[instrument], only_groups)
 
-        notes.append(build_drum_note(instrument, hand, snare_only))
+        notes.append(build_drum_note(instrument, hand, snare_only, tuplet))
 
     return notes
 
@@ -149,12 +177,13 @@ def choose_drum_hand(option, hand_history, only_groups):
     return choose_hand(hand_history, option["strokes"])
 
 
-def build_drum_note(instrument, hand, snare_only):
+def build_drum_note(instrument, hand, snare_only, tuplet):
     note = {
-        "duration": "16",
+        "duration": tuplet["duration"],
         "keys": instrument_keys(instrument),
         "instrument": instrument,
         "stroke_hand": hand,
+        "play_value": 1 / tuplet["subdivision"],
         "accented": instrument == "snare" and random.random() < 0.25,
     }
 

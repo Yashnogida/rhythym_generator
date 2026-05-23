@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QLabel, QLineE
 from PySide6.QtMultimedia import QSoundEffect
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
-from patterns import generate_drum_exercise
+from patterns import TUPLETS, generate_drum_exercise
 
 
 NOTE_VALUES = {
@@ -18,10 +18,12 @@ NOTE_VALUES = {
     "h": 2.0,
 }
 BPM = 90
+PATTERN_COUNT = 5
 
 
-def make_html(pattern, numerator, denominator):
+def make_html(pattern, numerator, denominator, tuplet_name):
     pattern_json = json.dumps(pattern)
+    tuplet_json = json.dumps(TUPLETS[tuplet_name])
 
     return f"""
 <!DOCTYPE html>
@@ -40,7 +42,7 @@ def make_html(pattern, numerator, denominator):
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 8px 18px;
+            padding: 8px 40px;
             width: 100vw;
             height: 100vh;
         }}
@@ -52,6 +54,7 @@ def make_html(pattern, numerator, denominator):
     <script>
         const VF = Vex.Flow;
         const pattern = {pattern_json};
+        const tuplet = {tuplet_json};
 
         const div = document.getElementById("notation");
         const renderer = new VF.Renderer(div, VF.Renderer.Backends.SVG);
@@ -107,6 +110,19 @@ def make_html(pattern, numerator, denominator):
                 return note;
             }});
 
+            const tuplets = [];
+            if (tuplet.tuplet_notes) {{
+                for (let noteIndex = 0; noteIndex < notes.length; noteIndex += tuplet.subdivision) {{
+                    const group = notes.slice(noteIndex, noteIndex + tuplet.subdivision);
+                    if (group.length === tuplet.subdivision) {{
+                        tuplets.push(new VF.Tuplet(group, {{
+                            num_notes: tuplet.tuplet_notes,
+                            notes_occupied: tuplet.notes_occupied
+                        }}));
+                    }}
+                }}
+            }}
+
             const voice = new VF.Voice({{
                 num_beats: {numerator},
                 beat_value: {denominator}
@@ -127,6 +143,10 @@ def make_html(pattern, numerator, denominator):
                 beam.setContext(context).draw();
             }});
 
+            tuplets.forEach(tupletBracket => {{
+                tupletBracket.setContext(context).draw();
+            }});
+
             x += measureWidth;
         }}
     </script>
@@ -140,8 +160,8 @@ class RhythmApp(QWidget):
         super().__init__()
 
         self.setWindowTitle("Rhythym Generator")
-        self.resize(870, 840)
-        self.setFixedSize(870, 840)
+        self.resize(870, 705)
+        self.setFixedSize(870, 705)
 
         self.web_views = []
         self.time_signature_inputs = []
@@ -155,7 +175,7 @@ class RhythmApp(QWidget):
 
         layout = QVBoxLayout()
 
-        for pattern_number in range(6):
+        for pattern_number in range(PATTERN_COUNT):
             row = QWidget()
             row.setFixedHeight(130)
 
@@ -306,21 +326,22 @@ class RhythmApp(QWidget):
 
         self.setLayout(layout)
 
-        for pattern_number in range(6):
+        for pattern_number in range(PATTERN_COUNT):
             self.generate(pattern_number)
 
     def generate(self, index):
         numerator, denominator = self.get_time_signature(index)
+        tuplet_name = self.tuplet_inputs[index].currentText()
         drum_options = self.get_drum_options(index)
-        error = self.validate_drum_options(numerator, denominator, drum_options)
+        error = self.validate_drum_options(numerator, denominator, drum_options, tuplet_name)
 
         if error:
             QMessageBox.warning(self, "Cannot generate exercise", error)
             return
 
-        pattern = generate_drum_exercise(numerator, denominator, drum_options)
+        pattern = generate_drum_exercise(numerator, denominator, drum_options, tuplet_name)
         self.current_patterns[index] = pattern
-        html = make_html(pattern, numerator, denominator)
+        html = make_html(pattern, numerator, denominator, tuplet_name)
         self.web_views[index].setHtml(html)
 
     def get_drum_options(self, index):
@@ -338,13 +359,16 @@ class RhythmApp(QWidget):
 
         return options
 
-    def validate_drum_options(self, numerator, denominator, drum_options):
+    def validate_drum_options(self, numerator, denominator, drum_options, tuplet_name):
         if not drum_options:
             return "Select at least one drum."
 
-        slots = numerator * (16 / denominator)
+        tuplet = TUPLETS[tuplet_name]
+        note_label = "16th" if tuplet_name == "Normal" else tuplet_name.lower()
+        quarter_notes = numerator * (4 / denominator)
+        slots = quarter_notes * tuplet["subdivision"]
         if slots != int(slots):
-            return "This time signature does not divide evenly into 16th notes."
+            return f"This time signature does not divide evenly into {note_label} notes."
 
         slots = int(slots)
         invalid_only_options = [
@@ -359,7 +383,7 @@ class RhythmApp(QWidget):
                 for option in invalid_only_options
             ]
             return (
-                f"This exercise has {slots} 16th notes, so "
+                f"This exercise has {slots} {note_label} notes, so "
                 f"{', '.join(descriptions)} cannot fill it evenly."
             )
 
@@ -413,8 +437,12 @@ class RhythmApp(QWidget):
                     timer.start(elapsed_ms)
                     self.play_timers.append(timer)
 
-                duration_name = note["duration"].rstrip("r")
-                elapsed_ms += round(NOTE_VALUES[duration_name] * seconds_per_quarter * 1000)
+                note_value = note.get("play_value")
+                if note_value is None:
+                    duration_name = note["duration"].rstrip("r")
+                    note_value = NOTE_VALUES[duration_name]
+
+                elapsed_ms += round(note_value * seconds_per_quarter * 1000)
 
         loop_timer = QTimer(self)
         loop_timer.setSingleShot(True)
