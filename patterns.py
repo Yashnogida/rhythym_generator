@@ -254,22 +254,37 @@ def follows_only_stroke_rule(hands, strokes):
     if len(hands) % strokes != 0:
         return False
 
+    previous_group_hand = None
+    first_group_hand = None
+
     for index in range(0, len(hands), strokes):
         group = hands[index:index + strokes]
         if len(set(group)) != 1:
             return False
 
-        next_group = hands[index + strokes:index + (strokes * 2)]
-        if next_group and group[0] == next_group[0]:
+        group_hand = group[0]
+        if first_group_hand is None:
+            first_group_hand = group_hand
+
+        if previous_group_hand == group_hand:
             return False
+
+        previous_group_hand = group_hand
+
+    if previous_group_hand == first_group_hand:
+        return False
 
     return True
 
 
 def follows_hand_sequence_rule(hands, max_same_hand):
+    if len(hands) <= max_same_hand:
+        return True
+
+    looped_hands = hands + hands[:max_same_hand]
     same_hand_count = 1
 
-    for previous_hand, current_hand in zip(hands, hands[1:]):
+    for previous_hand, current_hand in zip(looped_hands, looped_hands[1:]):
         if current_hand == previous_hand:
             same_hand_count += 1
             if same_hand_count > max_same_hand:
